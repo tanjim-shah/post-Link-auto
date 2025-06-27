@@ -48,7 +48,10 @@ def generate_image_url(title):
     try:
         response = requests.post(
             api_url,
-            json={"contents": [{"parts": [{"text": prompt}]}]},
+            json={
+                "contents": [{"parts": [{"text": prompt}]}],
+                "responseModality": ["IMAGE", "TEXT"]  # Specify modalities here
+            },
         )
         data = response.json()
 
@@ -56,12 +59,22 @@ def generate_image_url(title):
             print(f"Image API error {response.status_code}: {data}")
             return None
 
-        # Adjust parsing based on actual image API response structure
+        # Print full response for debugging (remove/comment out after)
+        # print(json.dumps(data, indent=2))
+
         if "candidates" in data and len(data["candidates"]) > 0:
             candidate = data["candidates"][0]
-            # Example extraction; update based on real API response
-            if "content" in candidate and "imageUrl" in candidate["content"]:
-                return candidate["content"]["imageUrl"]
+            content = candidate.get("content", {})
+
+            # Adjust this based on your actual API response
+            # Sometimes the image is base64, or sometimes there's a URL field
+            if "image" in content:
+                image_info = content["image"]
+                if isinstance(image_info, str):
+                    # Could be a base64 string or URL
+                    return image_info
+                if isinstance(image_info, dict) and "url" in image_info:
+                    return image_info["url"]
 
         print("Image URL not found in response:", data)
         return None
@@ -113,7 +126,7 @@ def main():
             continue
 
         post_to_linkedin(title, article_text, image_url)
-        sleep(10)  # to avoid API rate limits
+        sleep(10)  # To avoid rate limits
 
 if __name__ == "__main__":
     main()
