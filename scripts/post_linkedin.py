@@ -10,50 +10,62 @@ GOOGLE_API_KEY = os.environ["GOOGLE_API_KEY"]
 with open("urls.json") as f:
     urls = json.load(f)
 
+max_retries = 3
+retry_delay = 5  # seconds
+
 def generate_article_content(url):
     prompt = f"Write a professional LinkedIn article for this blog post: {url}"
-    response = requests.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GOOGLE_API_KEY}",
-        json={"contents": [{"parts": [{"text": prompt}]}]},
-    )
-    data = response.json()
+    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key={GOOGLE_API_KEY}"
 
-    if response.status_code != 200:
-        print(f"[ERROR] Article API returned status {response.status_code}")
-        print(data)
-        return None
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = requests.post(
+                api_url,
+                json={"contents": [{"parts": [{"text": prompt}]}]},
+            )
+            data = response.json()
 
-    if "candidates" in data and len(data["candidates"]) > 0:
-        return data["candidates"][0]["content"]["parts"][0]["text"]
-    else:
-        print("[ERROR] 'candidates' missing or empty in article API response")
-        print(data)
-        return None
+            if response.status_code != 200:
+                print(f"[Attempt {attempt}] API error {response.status_code}: {data}")
+                sleep(retry_delay)
+                continue
+
+            if "candidates" in data and len(data["candidates"]) > 0:
+                return data["candidates"][0]["content"]["parts"][0]["text"]
+            else:
+                print(f"[Attempt {attempt}] 'candidates' missing or empty in response: {data}")
+                sleep(retry_delay)
+        except Exception as e:
+            print(f"[Attempt {attempt}] Exception during API call: {e}")
+            sleep(retry_delay)
+
+    return f"Error generating article after {max_retries} attempts."
 
 def generate_image_url(title):
     prompt = f"Create a LinkedIn header image for: {title}"
-    response = requests.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key={GOOGLE_API_KEY}",
-        json={"contents": [{"parts": [{"text": prompt}]}]},
-    )
-    data = response.json()
+    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key={GOOGLE_API_KEY}"
 
-    if response.status_code != 200:
-        print(f"[ERROR] Image API returned status {response.status_code}")
-        print(data)
+    try:
+        response = requests.post(
+            api_url,
+            json={"contents": [{"parts": [{"text": prompt}]}]},
+        )
+        data = response.json()
+        if response.status_code != 200:
+            print(f"Image API error {response.status_code}: {data}")
+            return None
+
+        # Adjust the parsing below depending on actual image URL location in response
+        if "candidates" in data and len(data["candidates"]) > 0:
+            candidate = data["candidates"][0]
+            if "content" in candidate and "imageUrl" in candidate["content"]:
+                return candidate["content"]["imageUrl"]
+
+        print("Image URL not found in response:", data)
         return None
-
-    # Example: parse image URL from response (adjust according to real API)
-    # Here I assume the response has a key 'candidates' with 'imageUrl' somewhere
-    if "candidates" in data and len(data["candidates"]) > 0:
-        candidate = data["candidates"][0]
-        # This is just an example - adjust depending on real response structure
-        if "content" in candidate and "imageUrl" in candidate["content"]:
-            return candidate["content"]["imageUrl"]
-
-    print("[ERROR] Could not find image URL in response")
-    print(data)
-    return None
+    except Exception as e:
+        print("Exception generating image:", e)
+        return None
 
 def post_to_linkedin(title, body, image_url):
     headers = {
@@ -81,25 +93,25 @@ def post_to_linkedin(title, body, image_url):
     response = requests.post("https://api.linkedin.com/v2/ugcPosts", headers=headers, json=post_data)
     print(f"LinkedIn post response: {response.status_code} - {response.text}")
     if response.status_code != 201:
-        print("[ERROR] Failed to post on LinkedIn")
+        print("Error posting to LinkedIn")
 
 def main():
     for url in urls:
         title = f"Insights from: {url.split('/')[-1].replace('-', ' ').title()}"
-        print(f"Processing URL: {url}")
+        print(f"Processing: {url}")
 
         article_text = generate_article_content(url)
-        if not article_text:
-            print(f"[SKIP] Article generation failed for {url}")
+        if article_text.startswith("Error generating article"):
+            print(f"Skipping URL due to article generation error: {url}")
             continue
 
         image_url = generate_image_url(title)
         if not image_url:
-            print(f"[SKIP] Image generation failed for {url}")
+            print(f"Skipping URL due to image generation error: {url}")
             continue
 
         post_to_linkedin(title, article_text, image_url)
-        sleep(10)  # avoid rate limits or abuse
+        sleep(10)  # to avoid API rate limits
 
 if __name__ == "__main__":
     main()
