@@ -26,24 +26,24 @@ def generate_article_content(url):
             data = response.json()
 
             if response.status_code != 200:
-                print(f"[Attempt {attempt}] API error {response.status_code}: {data}")
+                print(f"[Attempt {attempt}] Article API error {response.status_code}: {data}")
                 sleep(retry_delay)
                 continue
 
             if "candidates" in data and len(data["candidates"]) > 0:
                 return data["candidates"][0]["content"]["parts"][0]["text"]
             else:
-                print(f"[Attempt {attempt}] 'candidates' missing or empty in response: {data}")
+                print(f"[Attempt {attempt}] 'candidates' missing or empty in article response: {data}")
                 sleep(retry_delay)
         except Exception as e:
-            print(f"[Attempt {attempt}] Exception during API call: {e}")
+            print(f"[Attempt {attempt}] Exception during article API call: {e}")
             sleep(retry_delay)
 
     return f"Error generating article after {max_retries} attempts."
 
 def generate_image_url(title):
     prompt = f"Create a LinkedIn header image for: {title}"
-    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key={GOOGLE_API_KEY}"
+    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key={GOOGLE_API_KEY}"
 
     try:
         response = requests.post(
@@ -51,13 +51,15 @@ def generate_image_url(title):
             json={"contents": [{"parts": [{"text": prompt}]}]},
         )
         data = response.json()
+
         if response.status_code != 200:
             print(f"Image API error {response.status_code}: {data}")
             return None
 
-        # Adjust the parsing below depending on actual image URL location in response
+        # Adjust parsing based on actual image API response structure
         if "candidates" in data and len(data["candidates"]) > 0:
             candidate = data["candidates"][0]
+            # Example extraction; update based on real API response
             if "content" in candidate and "imageUrl" in candidate["content"]:
                 return candidate["content"]["imageUrl"]
 
