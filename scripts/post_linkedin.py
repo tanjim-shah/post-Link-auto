@@ -13,6 +13,9 @@ LINKEDIN_ACCESS_TOKEN = os.environ["LINKEDIN_ACCESS_TOKEN"]
 GOOGLE_API_KEY = os.environ["GOOGLE_API_KEY"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
+print("Both GOOGLE_API_KEY and GEMINI_API_KEY are set. Using GOOGLE_API_KEY.")
+
+# Load blog post URLs
 with open("urls.json") as f:
     urls = json.load(f)
 
@@ -35,12 +38,12 @@ def generate_article_content(url):
 def generate_image(title, output_path):
     client = genai.Client(api_key=GEMINI_API_KEY)
     model = "gemini-2.0-flash-preview-image-generation"
-    prompt = f"Create a LinkedIn header image for: {title}"
+    prompt = f"Create a realistic LinkedIn header image for: {title}"
 
     contents = [
         types.Content(
             role="user",
-            parts=[types.Part.from_text(prompt)],
+            parts=[types.Part.from_text(text=prompt)],
         )
     ]
     config = types.GenerateContentConfig(
@@ -72,7 +75,7 @@ def upload_image_to_imgbb(image_path):
         b64 = base64.b64encode(f.read()).decode()
     res = requests.post(
         "https://api.imgbb.com/1/upload",
-        params={"key": "256e833edec817c8c932addfff87ec3c"},  # Replace with actual key
+        params={"key": "256e833edec817c8c932addfff87ec3c"},  # 🔁 Replace this!
         data={"image": b64},
     )
     data = res.json()
@@ -112,14 +115,16 @@ def main():
         title = f"Insights from: {url.split('/')[-1].replace('-', ' ').title()}"
         print(f"Processing: {url}")
 
+        # Generate article content
         article_text = generate_article_content(url)
         if article_text.startswith("Error"):
             print("Skipping due to article error.")
             continue
 
+        # Generate image and upload
         local_image_path = generate_image(title, "linkedin_image")
         if not local_image_path:
-            print("Skipping due to image error.")
+            print("Skipping due to image generation error.")
             continue
 
         image_url = upload_image_to_imgbb(local_image_path)
@@ -127,8 +132,9 @@ def main():
             print("Skipping due to image upload error.")
             continue
 
+        # Post to LinkedIn
         post_to_linkedin(title, article_text, image_url)
-        sleep(10)
+        sleep(10)  # avoid rate limits
 
 if __name__ == "__main__":
     main()
