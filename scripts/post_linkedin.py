@@ -16,8 +16,6 @@ GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 with open("urls.json") as f:
     urls = json.load(f)
 
-genai.configure(api_key=GEMINI_API_KEY)
-
 def generate_article_content(url):
     prompt = f"Write a professional LinkedIn article for this blog post: {url}"
     api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key={GOOGLE_API_KEY}"
@@ -70,12 +68,11 @@ def generate_image(title, output_path):
     return None
 
 def upload_image_to_imgbb(image_path):
-    # Optional: Replace with your preferred image host or CDN
     with open(image_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
     res = requests.post(
         "https://api.imgbb.com/1/upload",
-        params={"key": "YOUR_IMGBB_API_KEY"},
+        params={"key": "256e833edec817c8c932addfff87ec3c"},  # Replace with actual key
         data={"image": b64},
     )
     data = res.json()
